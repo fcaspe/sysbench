@@ -51,6 +51,7 @@ static sb_arg_t memory_args[] =
   SB_OPT("memory-oper", "type of memory operations {read, write, none}",
          "write", STRING),
   SB_OPT("memory-access-mode", "memory access mode {seq,rnd}", "seq", STRING),
+  SB_OPT("memory-target-rate", "target a specific transfer rate [B/s] (0 = don't throttle)", "0", SIZE),
 
   SB_OPT_END
 };
@@ -87,6 +88,7 @@ static sb_test_t memory_test =
 /* Test arguments */
 
 static ssize_t memory_block_size;
+static ssize_t memory_target_transfer_speed;
 static long long    memory_total_size;
 static unsigned int memory_scope;
 static unsigned int memory_oper;
@@ -122,6 +124,8 @@ int memory_init(void)
   char         *s;
 
   memory_block_size = sb_get_value_size("memory-block-size");
+  memory_target_transfer_speed = sb_get_value_size("memory-target-rate");
+  //printf("[DEBUG] memory_block_size = %d , memory_target_transfer_speed: %d\n",memory_block_size,memory_target_transfer_speed);
   if (memory_block_size < SIZEOF_SIZE_T ||
       /* Must be a power of 2 */
       (memory_block_size & (memory_block_size - 1)) != 0)
@@ -412,6 +416,12 @@ void memory_print_mode(void)
   log_text(LOG_NOTICE, "  total size: %ldMiB",
            (long)(memory_total_size / 1024 / 1024));
 
+    if(memory_target_transfer_speed != 0)
+    {
+        log_text(LOG_NOTICE, "  target transfer speed: %ldMiB/sec",
+               (long)(memory_target_transfer_speed / 1024 / 1024));
+    }
+
   switch (memory_oper) {
     case SB_MEM_OP_READ:
       str = "read";
@@ -473,9 +483,39 @@ void memory_report_cumulative(sb_stat_t *stat)
     const double mb = stat->events * memory_block_size / megabyte;
     log_text(LOG_NOTICE, "%4.2f MiB transferred (%4.2f MiB/sec)\n",
              mb, mb / stat->time_interval);
+    //printf("[DEBUG] time_interval: %d\n",stat->time_interval);
   }
 
   sb_report_cumulative(stat);
+}
+
+#include <time.h>
+
+volatile void memory_test_throttle(long long n_events,uint64_t time_acc)
+{
+  static struct timespec tim;
+  tim.tv_sec = 0;
+  
+  const uint64_t transferred_x8 = n_events * memory_block_size; //(Bytes)
+  const double current_rate = (double)transferred_x8 / (double)time_acc; // bytes / ns = GiB/s (or bytes/ns)
+  const double target_rate = (double) memory_target_transfer_speed /1e9 ; //bytes/s /1e9 = GiB/s (or bytes/ns)
+  const double speed_factor = current_rate / target_rate;
+  if(speed_factor >= 1.0)
+  {
+    
+  /*
+  target_rate = transferred/(time_acc + time_sleep)
+  target_rate*time_acc + target_rate*time_sleep = transferred
+  time_sleep = ( transferred/target_rate ) - time_acc)
+  */
+    tim.tv_nsec = (uint64_t)(transferred_x8/target_rate - time_acc);
+    nanosleep(&tim,NULL);
+  }
+  
+  //printf("current: %f, target: %f, transferred %f\n",current_rate,target_rate,transferred_x8/1024*1024);
+  //printf("[DEBUG] n_events = %d, time_acc = %f\n",n_events,time_acc);
+  //printf("rate %f \n",rate);
+  //printf("current rate: %4.2f MiB/s.\n",rate);
 }
 
 #ifdef HAVE_LARGE_PAGES

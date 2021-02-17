@@ -40,7 +40,7 @@
 
 #include "tests/sb_cpu.h"
 #include "tests/sb_fileio.h"
-#include "tests/sb_memory.h"
+//#include "tests/sb_memory.h" //dirty hack: defned after sb_stats_t so that the structure is visible
 #include "tests/sb_threads.h"
 #include "tests/sb_mutex.h"
 
@@ -108,6 +108,8 @@ typedef struct {
   uint64_t queue_length;        /* Event queue length (tx_rate-only) */
   uint64_t concurrency;         /* Number of in-flight events (tx_rate-only) */
 } sb_stat_t;
+
+#include "tests/sb_memory.h"
 
 /* Commands */
 

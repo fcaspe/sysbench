@@ -35,7 +35,8 @@ typedef enum
   SB_MEM_SCOPE_LOCAL
 } sb_mem_scope_t;
 
-
 int register_test_memory(sb_list_t *tests);
+
+volatile void memory_test_throttle(long long n_events,uint64_t time_acc);
 
 #endif

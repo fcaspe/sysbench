@@ -314,7 +314,7 @@ void sb_histogram_print(sb_histogram_t *h)
   if (maxcnt == 0)
     return;
 
-  printf("       value  ------------- distribution ------------- count\n");
+  printf("       value,count\n");
 
   for (i = 0; i < h->array_size; i++)
   {
@@ -323,9 +323,8 @@ void sb_histogram_print(sb_histogram_t *h)
 
     width = floor(array[i] * (double) 40 / maxcnt + 0.5);
 
-    printf("%12.3f |%-40.*s %lu\n",
+    printf("%12.3f,%lu\n",
            exp(i / h->range_mult + h->range_deduct),          /* value */
-           width, "****************************************", /* distribution */
            (unsigned long) array[i]);                /* count */
   }
 

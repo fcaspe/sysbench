@@ -162,6 +162,7 @@ TLS int sb_tls_thread_id;
 static void print_header(void);
 static void print_help(void);
 static void print_run_mode(sb_test_t *);
+static void throttle_routine();
 
 #ifdef HAVE_ALARM
 static void sigalrm_thread_init_timeout_handler(int sig)
@@ -761,15 +762,25 @@ void sb_event_stop(int thread_id)
   }
 }
 
-
+static void throttle_routine()
+{
+  static long long n_events = 0;
+  /*if(n_events == 0)
+    {
+    n_events++;
+    return;
+    }*/
+  const uint64_t time_acc = sb_timer_value(&sb_exec_timer);
+  memory_test_throttle(n_events,time_acc);
+  n_events++;
+  
+}
 /* Main event loop -- the default thread_run implementation */
-
-
 static int thread_run(sb_test_t *test, int thread_id)
 {
   sb_event_t        event;
   int               rc = 0;
-
+  long long         value = 0;
   while (sb_more_events(thread_id) && rc == 0)
   {
     event = test->ops.next_event(thread_id);
@@ -777,10 +788,17 @@ static int thread_run(sb_test_t *test, int thread_id)
       break;
 
     sb_event_start(thread_id);
+    
+    /*Here we could make sleep the thread while the timer is running, to throttle the data transfer rate.*/
+    if(event.type == SB_REQ_TYPE_MEMORY) //Here we ignore throttling for the last event we run, nevertheless this introduces a very small error.
+        {
+        throttle_routine();
+        }
 
     rc = test->ops.execute_event(&event, thread_id);
 
-    sb_event_stop(thread_id);
+    sb_event_stop(thread_id); // Inside this function we update the histogram.
+    //printf("[DEBUG] captured timer value: %d\n",value);
   }
 
   return rc;
@@ -1054,7 +1072,10 @@ static int run_test(sb_test_t *test)
   pthread_t    checkpoints_thread;
   pthread_t    eventgen_thread;
   unsigned int barrier_threads;
-
+  
+  
+  //printf("[DEBUG] sysbench.c - run_test() started.\n");
+  
   /* initialize test */
   if (test->ops.init != NULL && test->ops.init() != 0)
     return 1;
@@ -1150,10 +1171,10 @@ static int run_test(sb_test_t *test)
     alarm(NS2SEC(sb_globals.max_time_ns) + sb_globals.timeout);
   }
 #endif
-
+  //printf("[DEBUG] sysbench.c - run_test() waiting to join workers . . .\n");
   if ((err = sb_thread_join_workers()))
     return err;
-
+  //printf("[DEBUG] sysbench.c - run_test() workers joined!\n");
   sb_timer_stop(&sb_exec_timer);
   sb_timer_stop(&sb_intermediate_timer);
   sb_timer_stop(&sb_checkpoint_timer);
@@ -1213,7 +1234,9 @@ static int run_test(sb_test_t *test)
   /* finalize test */
   if (test->ops.done != NULL)
     (*(test->ops.done))();
-
+  
+  //printf("[DEBUG] sysbench.c - run_test() finished.\n");
+  
   return sb_globals.error != 0;
 }
 
