@@ -788,17 +788,16 @@ static int thread_run(sb_test_t *test, int thread_id)
       break;
 
     sb_event_start(thread_id);
-    
-    /*Here we could make sleep the thread while the timer is running, to throttle the data transfer rate.*/
-    if(event.type == SB_REQ_TYPE_MEMORY) //Here we ignore throttling for the last event we run, nevertheless this introduces a very small error.
-        {
-        throttle_routine();
-        }
 
     rc = test->ops.execute_event(&event, thread_id);
 
     sb_event_stop(thread_id); // Inside this function we update the histogram.
     //printf("[DEBUG] captured timer value: %d\n",value);
+        /*Here we could make sleep the thread while the timer is running, to throttle the data transfer rate.*/
+    if(event.type == SB_REQ_TYPE_MEMORY) //Here we ignore throttling for the last event we run, nevertheless this introduces a very small error.
+        {
+        throttle_routine();
+        }
   }
 
   return rc;
