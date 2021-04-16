@@ -177,6 +177,19 @@ static void sigalrm_thread_init_timeout_handler(int sig)
   exit(2);
 }
 
+int stop_process = 0;
+
+void sigint_handler(int signo)
+{
+  if (signo == SIGINT)
+    {
+    stop_process = 1;
+    //printf("received SIGINT\n");
+    }
+  
+}
+
+
 /* Default intermediate reports handler */
 
 void sb_report_intermediate(sb_stat_t *stat)
@@ -794,10 +807,14 @@ static int thread_run(sb_test_t *test, int thread_id)
     sb_event_stop(thread_id); // Inside this function we update the histogram.
     //printf("[DEBUG] captured timer value: %d\n",value);
         /*Here we could make sleep the thread while the timer is running, to throttle the data transfer rate.*/
-    if(event.type == SB_REQ_TYPE_MEMORY) //Here we ignore throttling for the last event we run, nevertheless this introduces a very small error.
+    
+     //If received an event indicating end of process, here we ignore throttling for the last event we run, nevertheless this introduces a very small error.
+    if(event.type == SB_REQ_TYPE_MEMORY)
         {
         throttle_routine();
         }
+    if(stop_process == 1)
+        break;
   }
 
   return rc;
@@ -1220,6 +1237,7 @@ static int run_test(sb_test_t *test)
   {
     if (sb_globals.histogram)
     {
+      sb_histogram_write_csv(&sb_latency_histogram);
       log_text(LOG_NOTICE, "Latency histogram (values are in milliseconds)");
       sb_histogram_print(&sb_latency_histogram);
       log_text(LOG_NOTICE, " ");
@@ -1420,6 +1438,13 @@ static int init(void)
 
 int main(int argc, char *argv[])
 {
+  if (signal(SIGINT, sigint_handler) == SIG_ERR)
+    {
+    printf("\nError: Can't catch SIGINT\n");
+    return EXIT_FAILURE;
+    }
+  
+  
   sb_test_t *test = NULL;
   int rc;
 

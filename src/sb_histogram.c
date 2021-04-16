@@ -332,6 +332,53 @@ void sb_histogram_print(sb_histogram_t *h)
 }
 
 
+void sb_histogram_write_csv(sb_histogram_t *h)
+{
+  uint64_t maxcnt;
+  size_t   i;
+
+  pthread_rwlock_wrlock(&h->lock);
+
+  merge_intermediate_into_cumulative(h);
+
+  uint64_t * const array = h->cumulative_array;
+
+  maxcnt = 0;
+  for (i = 0; i < h->array_size; i++)
+  {
+    if (array[i] > maxcnt)
+      maxcnt = array[i];
+  }
+
+  if (maxcnt == 0)
+    return;
+
+   int num;
+   FILE *fp;
+
+   // use appropriate location if you are using MacOS or Linux
+   fp = fopen("histogram.csv","w");
+   if(fp == NULL)
+   {
+      printf("[ERROR] Can't open file histogram.csv\n");
+      return;
+   }
+
+  for (i = 0; i < h->array_size; i++)
+  {
+    if (array[i] == 0)
+      continue;
+
+    fprintf(fp,"%12.3f,%lu\n",
+           exp(i / h->range_mult + h->range_deduct),          /* value */
+           (unsigned long) array[i]);                /* count */
+  }
+
+  pthread_rwlock_unlock(&h->lock);
+}
+
+
+
 void sb_histogram_done(sb_histogram_t *h)
 {
   pthread_rwlock_destroy(&h->lock);

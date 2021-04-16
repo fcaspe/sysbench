@@ -113,6 +113,10 @@ double sb_histogram_get_pct_checkpoint(sb_histogram_t *h, double percentile);
 */
 void sb_histogram_print(sb_histogram_t *h);
 
+/*
+  Dump a given histogram to file.
+*/
+void sb_histogram_write_csv(sb_histogram_t *h);
 /* Destroy a given histogram object */
 void sb_histogram_done(sb_histogram_t *h);
 
